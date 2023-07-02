@@ -29,6 +29,80 @@ services:
     depends_on:
       - mariadb
 
+  collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: collector
+    hostname: collector
+    depends_on:
+      tempo:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    command: [ "--config=/etc/collector-config.yaml" ]
+    volumes:
+      - ./collector-config-local.yaml:/etc/collector-config.yaml
+    ports:
+      - "5555:5555"
+      - "6666:6666"
+
+  tempo:
+    image: grafana/tempo:1.5.0
+    command: [ "-search.enabled=true", "-config.file=/etc/tempo.yaml" ]
+    container_name: tempo
+    hostname: tempo
+    volumes:
+      - ./o11y-backend/tempo-config.yaml:/etc/tempo.yaml
+      - ./o11y-backend/tempo-overrides.yaml:/etc/overrides.yaml
+      - ./tempo-data:/tmp/tempo
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+    healthcheck:
+      interval: 5s
+      retries: 10
+      test: wget --no-verbose --tries=1 --spider http://localhost:3200/status || exit 1
+
+  prometheus:
+    image: prom/prometheus:v2.39.2
+    container_name: prometheus
+    hostname: prometheus
+    command:
+      - --config.file=/etc/prometheus.yaml
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+    volumes:
+      - ./o11y-backend/prometheus.yaml:/etc/prometheus.yaml
+    ports:
+      - "9090:9090"
+    healthcheck:
+      interval: 5s
+      retries: 10
+      test: wget --no-verbose --tries=1 --spider http://localhost:9090/status || exit 1
+
+  grafana:
+    image: grafana/grafana:9.2.2
+    container_name: grafana
+    hostname: grafana
+    depends_on:
+      tempo:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    volumes:
+      - ./o11y-backend/grafana-bootstrap.ini:/etc/grafana/grafana.ini
+      - ./o11y-backend/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    ports:
+      - "3000:3000"
+    healthcheck:
+      interval: 5s
+      retries: 10
+      test: wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
+
+
 #networks:
 #  bookstore-mariadb:
 #    driver: bridge
