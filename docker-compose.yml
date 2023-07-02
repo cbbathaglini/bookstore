@@ -1,0 +1,34 @@
+version: '3'
+
+services:
+  mariadb:
+    image: mariadb:10.2
+    ports:
+      - 3307:3306
+    environment:
+      #MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 1
+      MARIADB_ROOT_PASSWORD: password
+      MARIADB_DATABASE: books
+
+
+  bookstoreimg:
+    restart: always
+    build:
+      dockerfile: ./Dockerfile
+      context: .
+    image: bookstoreimg
+    ports:
+      - 8083:8080
+#    networks:
+#      - bookstore-mariadb
+    environment:
+      DB_DATABASE: books
+      DB_USER: root
+      DB_HOST: jdbc:mariadb://mariadb/books
+      DB_PASSWORD: password
+    depends_on:
+      - mariadb
+
+#networks:
+#  bookstore-mariadb:
+#    driver: bridge
