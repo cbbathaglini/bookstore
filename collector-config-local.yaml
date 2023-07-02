@@ -1,0 +1,25 @@
+receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:5555
+
+exporters:
+  logging:
+    loglevel: debug
+  prometheus:
+    endpoint: collector:6666
+    namespace: default
+  otlp:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [logging,prometheus]
+    traces:
+      receivers: [otlp]
+      exporters: [logging,otlp]
